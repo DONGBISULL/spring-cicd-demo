@@ -63,8 +63,7 @@ jobs:
 
       - name: Harbor 로그인
         run: |
-          echo "${{ secrets.HARBOR_PASSWORD }}" | docker login ${{ env.HARBOR_REGISTRY }} \
-            --username "${{ secrets.HARBOR_USERNAME }}" --password-stdin
+          HARBOR_PASSWORD=$(kubectl get secret harbor-admin-secret -n harbor-system -o jsonpath='{.data.password}' | base64 -d)
 
       # 실행 단계 run 명령어
       - name: 빌드 실행
