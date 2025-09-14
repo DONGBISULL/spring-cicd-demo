@@ -1,0 +1,26 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# 작업 목록
+jobs:
+  test-job: 
+    runs-on: ubuntu-latest
+    steps:   
+    - name: 코드 받기
+      uses: actions/checkout@v4
+    - name: 테스트 실행
+      run: ./gradlew test
+  build-job:             
+    runs-on: ubuntu-latest
+    needs: test-job        # test-job 완료 후 실행
+    steps:
+    - name: 코드 받기
+      uses: actions/checkout@v4
+    - name: 빌드 실행
+      run: ./gradlew build
+      
