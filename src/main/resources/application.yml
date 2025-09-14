@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: spring-cicd-demo
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info"
+
+server:
+  port: 8080

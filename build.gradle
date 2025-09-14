@@ -2,6 +2,8 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.5'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.gorylenko.gradle-git-properties' version '2.4.2'
+    id 'jacoco'
 }
 
 group = 'dev.exam'
@@ -27,12 +29,35 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+springBoot {
+    buildInfo {
+        properties {
+            // CI/CD에서 환경변수로 전달되는 값들을 주입
+            additional = [
+                    commit    : (System.getenv("GIT_SHA") ?: "unknown"),
+                    buildTime : (System.getenv("BUILD_TIME") ?: java.time.ZonedDateTime.now(java.time.ZoneId.of("UTC"))
+                            .format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+            ]
+        }
+    }
+}
+
 tasks.named('test') {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }
