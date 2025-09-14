@@ -2,133 +2,25 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main , develop ]
   pull_request:
     branches: [ main ]
-
-env:
-  # 환경변수 설정
-  GIT_SHA: ${{ github.sha }}
-  BUILD_TIME: ${{ github.event.head_commit.timestamp }}
-  HARBOR_REGISTRY: kubernetes.docker.internal:30002
-  HARBOR_PROJECT: spring-cdcd
-  IMAGE_NAME: my-app
-  DOCKER_HOST: unix://$HOME/.docker/run/docker.sock
 
 # 작업 목록
 jobs:
   test-job:
-    # setting > action 에서 설정한 러너로 사용하도록 수정
     runs-on: self-hosted
     steps:
       - name: 코드 받기
         uses: actions/checkout@v4
-
-      - name: JDK 21 설정
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      # 권한 오류 막기 위한 설정
-      - name: Gradle 권한 부여
-        run: chmod +x ./gradlew
-
-      - name: 환경 변수 확인
-        run: |
-          echo "GIT_SHA: $GIT_SHA"
-          echo "BUILD_TIME $BUILD_TIME"
-          echo "Current time $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
       - name: 테스트 실행
         run: ./gradlew test
-        env:
-          GIT_SHA: ${{ env.GIT_SHA }}
-          BUILD_TIME: ${{ env.BUILD_TIME }}
-
-  build-push:
+  build-job:
     runs-on: self-hosted
-    needs: test-job        # test-job 완료 후 실행
+    needs: test-job
     steps:
       - name: 코드 받기
         uses: actions/checkout@v4
-
-      - name: JDK 21 설정
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      # 권한 오류 막기 위한 설정
-      - name: Gradle 권한 부여
-        run: chmod +x ./gradlew
-
-      # Docker 데몬 확인 및 설정
-      - name: Docker 설정 초기화
-        run: |
-          echo "🔧 Docker 상태 확인 및 설정..."
-
-          # macOS Docker Desktop 소켓 경로 설정
-          export DOCKER_HOST=unix://$HOME/.docker/run/docker.sock
-
-          # Docker 데몬 상태 확인
-          if ! docker info >/dev/null 2>&1; then
-            echo "Docker Desktop이 실행 중인지 확인해주세요."
-            echo "DOCKER_HOST: $DOCKER_HOST"
-            exit 1
-          fi
-
-          # Docker config 디렉토리와 파일 생성
-          mkdir -p ~/.docker
-
-          cat > ~/.docker/config.json << EOF
-          {
-            "auths": {}
-          }
-          EOF
-
-          echo "✅ Docker 설정 완료"
-
-      - name: Harbor 로그인
-        run: |
-          # Harbor 상태 확인
-          curl -f http://${{ env.HARBOR_REGISTRY }}/api/v2.0/health || {
-            echo "❌ Harbor에 접근할 수 없습니다!"
-            exit 1
-          }
-
-          # Harbor 비밀번호 가져오기
-          HARBOR_PASSWORD=$(kubectl get secret harbor-admin-secret -n harbor -o jsonpath='{.data.password}' | base64 -d)
-
-          # Docker 로그인
-          echo "$HARBOR_PASSWORD" | docker login ${{ env.HARBOR_REGISTRY }} --username admin --password-stdin
-
-          echo "✅ Harbor 로그인 성공"
-
-      # 실행 단계 run 명령어
       - name: 빌드 실행
-        run: ./gradlew clean build --no-daemon
-        env:
-          GIT_SHA: ${{ env.GIT_SHA }}
-          BUILD_TIME: ${{ env.BUILD_TIME }}
-
-      - name: Docker 이미지 빌드 및 푸시
-        run: |
-          # 이미지 태그 생성
-          if [ "${{ github.ref_name }}" = "main" ]; then
-            TAG="latest"
-          else
-            TAG="${{ github.ref_name }}"
-          fi
-
-          IMAGE_TAG="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${TAG}"
-          SHA_TAG="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
-
-          # 이미지 빌드
-          docker build -t $IMAGE_TAG -t $SHA_TAG .
-
-          # 이미지 푸시
-          docker push $IMAGE_TAG
-          docker push $SHA_TAG
-
-          echo "Tags: $TAG, ${{ github.sha }}"
-  
+        run: ./gradlew build
+      
