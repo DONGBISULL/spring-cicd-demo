@@ -61,8 +61,27 @@ jobs:
       - name: Gradle 권한 부여
         run: chmod +x ./gradlew
 
+      # 인증 오류로 에러 발생
+      - name: Docker 설정 초기화
+        run: |
+          echo "🔧 Docker credential 문제 해결..."
+          
+          # Docker config 디렉토리와 파일 생성
+          mkdir -p ~/.docker
+          
+          cat > ~/.docker/config.json << EOF
+          {
+            "auths": {}
+          }
+          EOF
+
       - name: Harbor 로그인
         run: |
+          curl -f http://${{ env.HARBOR_REGISTRY }}/api/v2.0/health || {
+          echo "❌ Harbor에 접근할 수 없습니다!"
+          exit 1
+          }
+          
           HARBOR_PASSWORD=$(kubectl get secret harbor-admin-secret -n harbor-system -o jsonpath='{.data.password}' | base64 -d)
 
       # 실행 단계 run 명령어
