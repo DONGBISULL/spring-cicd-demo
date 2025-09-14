@@ -1,0 +1,52 @@
+# harbor/values.yaml
+# 패스워드 없음 - Git에 안전하게 푸시 가능 ✅
+
+expose:
+  type: nodePort
+  tls:
+    enabled: false
+  nodePort:
+    ports:
+      http:
+        port: 80
+        nodePort: 30002
+
+externalURL: http://localhost:30002
+
+# 패스워드는 Kubernetes Secret에서 참조
+# 처음 생성 시 namespace 와 비밀번호 생성 해줘야함
+existingSecretAdminPassword: harbor-admin-secret
+existingSecretAdminPasswordKey: password
+
+# 스토리지 설정
+persistence:
+  enabled: true
+  resourcePolicy: "keep"
+  persistentVolumeClaim:
+    registry:
+      storageClass: ""
+      size: 20Gi
+    database:
+      storageClass: ""
+      size: 5Gi
+    redis:
+      storageClass: ""
+      size: 2Gi
+
+# 불필요한 컴포넌트 비활성화 (리소스 절약)
+chartmuseum:
+  enabled: false
+notary:
+  enabled: false
+trivy:
+  enabled: true
+
+# 리소스 최적화 (로컬 환경용)
+core:
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 1Gi
+      cpu: 500m

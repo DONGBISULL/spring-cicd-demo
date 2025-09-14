@@ -10,12 +10,15 @@ env:
   # 환경변수 설정
   GIT_SHA: ${{ github.sha }}
   BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+  HARBOR_REGISTRY: localhost:30002
+  HARBOR_PROJECT: spring-cdcd
+  IMAGE_NAME: my-app
 
 # 작업 목록
 jobs:
   test-job:
-    # github 의 가상 vm에서 실행됨
-    runs-on: ubuntu-latest
+    # setting > action 에서 설정한 러너로 사용하도록 수정
+    runs-on: self-hosted
     steps:
       - name: 코드 받기
         uses: actions/checkout@v4
@@ -41,8 +44,8 @@ jobs:
           GIT_SHA: ${{ env.GIT_SHA }}
           BUILD_TIME: ${{ env.BUILD_TIME }}
 
-  build-job:
-    runs-on: ubuntu-latest
+  build-push:
+    runs-on: self-hosted
     needs: test-job        # test-job 완료 후 실행
     steps:
       - name: 코드 받기
@@ -58,6 +61,11 @@ jobs:
       - name: Gradle 권한 부여
         run: chmod +x ./gradlew
 
+      - name: Harbor 로그인
+        run: |
+          echo "${{ secrets.HARBOR_PASSWORD }}" | docker login ${{ env.HARBOR_REGISTRY }} \
+            --username "${{ secrets.HARBOR_USERNAME }}" --password-stdin
+
       # 실행 단계 run 명령어
       - name: 빌드 실행
         run: ./gradlew clean build --no-daemon
@@ -65,30 +73,24 @@ jobs:
           GIT_SHA: ${{ env.GIT_SHA }}
           BUILD_TIME: ${{ env.BUILD_TIME }}
 
-      - name: JAR 파일 업로드
-        uses: actions/upload-artifact@v4
-        with:
-          name: jar-artifact
-          path: build/libs/*.jar
-
-  # 하버 관리 위헤 미리 지정
-  docker-build-job:
-    runs-on: ubuntu-latest
-    needs: build-job
-    steps:
-      - name: 코드 받기
-        uses: actions/checkout@v4
-
-      - name: JAR 파일 다운로드
-        uses: actions/download-artifact@v4
-        with:
-          name: jar-artifact
-          path: build/libs/
-
-      - name: 도커 이미지 빌드
+      - name: Docker 이미지 빌드 및 푸시
         run: |
-          echo "Building with GIT_SHA: $GIT_SHA"
-          docker build -t my-app:$GIT_SHA .
-          docker tag my-app:$GIT_SHA my-app:latest
-        env:
-          GIT_SHA: ${{ env.GIT_SHA }}
+          # 이미지 태그 생성
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            TAG="latest"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          
+          IMAGE_TAG="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${TAG}"
+          SHA_TAG="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          
+          # 이미지 빌드
+          docker build -t $IMAGE_TAG -t $SHA_TAG .
+          
+          # 이미지 푸시
+          docker push $IMAGE_TAG
+          docker push $SHA_TAG
+          
+          echo "Tags: $TAG, ${{ github.sha }}"
+  
