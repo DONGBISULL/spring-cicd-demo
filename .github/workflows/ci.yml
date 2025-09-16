@@ -10,9 +10,10 @@ env:
   # 환경변수 설정
   GIT_SHA: ${{ github.sha }}
   BUILD_TIME: ${{ github.event.head_commit.timestamp }}
-  HARBOR_REGISTRY: localhost:30002
+  HARBOR_REGISTRY: kubernetes.docker.internal:30002
   HARBOR_PROJECT: spring-cdcd
   IMAGE_NAME: my-app
+  DOCKER_HOST: unix://$HOME/.docker/run/docker.sock
 
 # 작업 목록
 jobs:
@@ -61,28 +62,47 @@ jobs:
       - name: Gradle 권한 부여
         run: chmod +x ./gradlew
 
-      # 인증 오류로 에러 발생
+      # Docker 데몬 확인 및 설정
       - name: Docker 설정 초기화
         run: |
-          echo "🔧 Docker credential 문제 해결..."
-          
+          echo "🔧 Docker 상태 확인 및 설정..."
+
+          # macOS Docker Desktop 소켓 경로 설정
+          export DOCKER_HOST=unix://$HOME/.docker/run/docker.sock
+
+          # Docker 데몬 상태 확인
+          if ! docker info >/dev/null 2>&1; then
+            echo "Docker Desktop이 실행 중인지 확인해주세요."
+            echo "DOCKER_HOST: $DOCKER_HOST"
+            exit 1
+          fi
+
           # Docker config 디렉토리와 파일 생성
           mkdir -p ~/.docker
-          
+
           cat > ~/.docker/config.json << EOF
           {
             "auths": {}
           }
           EOF
 
+          echo "✅ Docker 설정 완료"
+
       - name: Harbor 로그인
         run: |
+          # Harbor 상태 확인
           curl -f http://${{ env.HARBOR_REGISTRY }}/api/v2.0/health || {
-          echo "❌ Harbor에 접근할 수 없습니다!"
-          exit 1
+            echo "❌ Harbor에 접근할 수 없습니다!"
+            exit 1
           }
-          
-          HARBOR_PASSWORD=$(kubectl get secret harbor-admin-secret -n harbor-system -o jsonpath='{.data.password}' | base64 -d)
+
+          # Harbor 비밀번호 가져오기
+          HARBOR_PASSWORD=$(kubectl get secret harbor-admin-secret -n harbor -o jsonpath='{.data.password}' | base64 -d)
+
+          # Docker 로그인
+          echo "$HARBOR_PASSWORD" | docker login ${{ env.HARBOR_REGISTRY }} --username admin --password-stdin
+
+          echo "✅ Harbor 로그인 성공"
 
       # 실행 단계 run 명령어
       - name: 빌드 실행
@@ -99,16 +119,16 @@ jobs:
           else
             TAG="${{ github.ref_name }}"
           fi
-          
+
           IMAGE_TAG="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${TAG}"
           SHA_TAG="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
-          
+
           # 이미지 빌드
           docker build -t $IMAGE_TAG -t $SHA_TAG .
-          
+
           # 이미지 푸시
           docker push $IMAGE_TAG
           docker push $SHA_TAG
-          
+
           echo "Tags: $TAG, ${{ github.sha }}"
   
