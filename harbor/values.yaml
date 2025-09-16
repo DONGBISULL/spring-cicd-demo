@@ -20,23 +20,24 @@ persistence:
   resourcePolicy: "keep"
   persistentVolumeClaim:
     registry:
-      storageClass: "docker-desktop"   # ★ 명시
+      storageClass: "hostpath"
       size: 20Gi
     database:
-      storageClass: "docker-desktop"   # ★ 명시
+      storageClass: "hostpath"
       size: 5Gi
     redis:
-      storageClass: "docker-desktop"   # ★ 명시
+      storageClass: "hostpath"
       size: 2Gi
 
+#  불필요한 컴포넌트 비활성화
 chartmuseum:
   enabled: false
 notary:
   enabled: false
-trivy:
-  enabled: true
+clair:
+  enabled: false
 
 core:
   resources:
     requests: { memory: 256Mi, cpu: 100m }
-    limits:   { memory: 1Gi,   cpu: 500m }
+    limits: { memory: 1Gi,   cpu: 500m }
