@@ -45,10 +45,10 @@ jobs:
     environment: env
     env:
       HARBOR_SCHEME: http
-      HARBOR_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
+      HARBOR_REGISTRY: ${{ vars.HARBOR_REGISTRY }}
+      HARBOR_PROJECT: ${{ vars.HARBOR_PROJECT }}
       HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
       HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-      HARBOR_PROJECT: ${{ secrets.HARBOR_PROJECT }}
 
     steps:
       - name: Harbor Connection Test
