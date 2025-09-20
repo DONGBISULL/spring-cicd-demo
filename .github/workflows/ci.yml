@@ -8,6 +8,11 @@ on:
 
 env:
   # 환경변수 설정
+  HARBOR_SCHEME: http
+  HARBOR_REGISTRY: ${{ secrets.HARBOR_REGISTRY }}
+  HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+  HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+  HARBOR_PROJECT: ${{ secrets.HARBOR_PROJECT }}
   GIT_SHA: ${{ github.sha }}
   BUILD_TIME: ${{ github.event.head_commit.timestamp }}
 
@@ -25,16 +30,6 @@ jobs:
     needs: test-job
     steps:
       # 현재 파일의 위치와 별개로 git action 워크플로우 파일 위치와 상관 없이 리포지토리 루트에서 실행
-      - name: Load .env variables
-        run: |
-          while IFS='=' read -r key value; do
-            # 주석과 빈 줄 제외
-            if [[ ! $key =~ ^# && -n $key ]]; then
-              # 따옴표 제거
-              value=$(echo "$value" | sed 's/^"\(.*\)"$/\1/')
-              echo "$key=$value" >> $GITHUB_ENV
-            fi
-          done < .env
       - name: checkout source code
         uses: actions/checkout@v4
 
@@ -49,3 +44,22 @@ jobs:
       # 테스트 잡에서 실행하는 부분 제외
       - name: Build with Gradle
         run: ./gradlew build -x test
+  harbor-test:
+    runs-on: self-hosted
+    needs: test-job
+    steps:
+      - name: Harbor Connection Test
+        run: |
+          set -e
+          BASE_URL="${HARBOR_SCHEME}://${HARBOR_REGISTRY}"
+          
+          if curl -fsS -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" "$BASE_URL/api/v2.0/projects?name=$HARBOR_PROJECT" | grep -q "project_id"; then
+            echo "Project '$HARBOR_PROJECT' accessible"
+          else
+            echo " Project '$HARBOR_PROJECT' not accessible"
+            echo "Please check:"
+            echo "  - Project name: $HARBOR_PROJECT"
+            echo "  - User permissions"
+            echo "  - Registry URL: $HARBOR_REGISTRY"
+            exit 1
+          fi
