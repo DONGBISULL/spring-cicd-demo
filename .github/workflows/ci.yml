@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  # 환경변수 설정
+  GIT_SHA: ${{ github.sha }}
+  BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+
 # 작업 목록
 jobs:
   test-job:
@@ -19,8 +24,28 @@ jobs:
     runs-on: self-hosted
     needs: test-job
     steps:
-      - name: 코드 받기
+      # 현재 파일의 위치와 별개로 git action 워크플로우 파일 위치와 상관 없이 리포지토리 루트에서 실행
+      - name: Load .env variables
+        run: |
+          while IFS='=' read -r key value; do
+            # 주석과 빈 줄 제외
+            if [[ ! $key =~ ^# && -n $key ]]; then
+              # 따옴표 제거
+              value=$(echo "$value" | sed 's/^"\(.*\)"$/\1/')
+              echo "$key=$value" >> $GITHUB_ENV
+            fi
+          done < .env
+      - name: checkout source code
         uses: actions/checkout@v4
-      - name: 빌드 실행
-        run: ./gradlew build
-      
+
+      - name: setup jdk
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      - name: Grant permission
+        run: chmod +x ./gradlew
+      # 테스트 잡에서 실행하는 부분 제외
+      - name: Build with Gradle
+        run: ./gradlew build -x test
