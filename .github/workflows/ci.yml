@@ -49,6 +49,7 @@ jobs:
       HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
       HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
       HARBOR_PROJECT: ${{ secrets.HARBOR_PROJECT }}
+
     steps:
       - name: Harbor Connection Test
         run: |
