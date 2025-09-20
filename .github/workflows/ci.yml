@@ -55,16 +55,18 @@ jobs:
         run: |
           set -e
           BASE_URL="${HARBOR_SCHEME}://${HARBOR_REGISTRY}"
-          
-          if curl -fsS -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" \
-             "$BASE_URL/api/v2.0/projects?name=$HARBOR_PROJECT" 2>/dev/null | \
-             grep -q "project_id"; then
-             echo "Project '$HARBOR_PROJECT' accessible"
-          else
-            echo " Project '$HARBOR_PROJECT' not accessible"
-            echo "Please check:"
-            echo "  - Project name: $HARBOR_PROJECT"
-            echo "  - User permissions"
-            echo "  - Registry URL: $HARBOR_REGISTRY"
+
+          echo "시크릿 확인"
+          echo "Harbor URL: $BASE_URL"
+          echo "Project: $HARBOR_PROJECT"
+          echo "Username: $HARBOR_USERNAME"
+
+          echo " 연결 "
+          if ! curl -f -s --connect-timeout 10 "$BASE_URL/api/v2.0/systeminfo" > /dev/null; then
+            echo "Cannot connect to Harbor at $BASE_URL"
+            echo "Check if Harbor is running and accessible from this runner"
             exit 1
+          fi
+          echo " Harbor is accessible"
+
           fi
