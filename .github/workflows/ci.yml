@@ -68,5 +68,3 @@ jobs:
             exit 1
           fi
           echo " Harbor is accessible"
-
-          fi
